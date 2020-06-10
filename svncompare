@@ -1,0 +1,155 @@
+#!/usr/bin/perl -w
+
+$source_path = $ARGV[0];
+$dest_path = $ARGV[1];
+$project = $ARGV[2];
+
+#$source_path = "/home/s/";
+#$dest_path = "/home/svnwc/";
+
+$exclude_svn = " | grep -v \\.svn";
+$exclude_object = ' | grep -v \\.o$ | grep -v \\.cf~$ | grep -v \\.tc~$ | grep -v \/cc_.*';
+
+#$path_list = "SpectrumMaster SpectrumLocal env local sadm src tone toolbox MCS_CONF GLOB";
+#$path_list = "src/code/dmsdev/";
+#$path_list = "env src MCS_CONF";
+
+$find_params = "$path_list ! -name '*.fmt'  -follow $exclude_object";
+
+if (!defined($source_path) || !defined($dest_path))
+	{
+	print "Usage: compare.pl SOURCEPATH/ DESTPATH/\n";
+	exit;
+	}
+
+print "Comparing $source_path with $dest_path\nGenerating Filelist (this may take some time)\n";
+
+print "Generating source file tree\n";
+print $find_params;
+@list = `cd $source_path; find $find_params `;
+chomp(@list);
+
+print "Filling Hash Table Source\n";
+for ($i = 0; $i < @list; $i++)
+{
+$hash{$list[$i]}++;
+}
+
+print "Generating destination file tree\n";
+$dest_command = "cd $dest_path; find $find_params $exclude_svn";
+print $dest_command."\n";
+@list = `$dest_command`;
+chomp(@list);
+
+print "Filling Hash Table Destination\n";
+for ($i = 0; $i < @list; $i++)
+{
+$hash{$list[$i]}++;
+}
+
+$number_of_files = @list;
+print "Found $number_of_files files to compare\n";
+
+$date=`date '+%y%m%d_%H:%M'`;
+chop $date;
+#$date=$date."_".$project;
+$date=$date."_";
+print $date;
+
+`mkdir $date`;
+
+open(MISS_SOURCE,">$date/${date}_miss_source.list");
+open(SOURCE,">$date/${date}_s2d.sh");
+open(MISS_DEST,">$date/${date}_miss_dest.list");
+open(DEST,">$date/${date}_d2s.sh");
+open(PLAIN,">$date/${date}_plain.list");
+open(MERGE,">$date/${date}_filemerge.list");
+open(MESSAGES,">$date/${date}_message.list");
+foreach $key (sort keys(%hash))
+{
+$file_source = $source_path.$key;
+$file_dest = $dest_path.$key;
+if (-f $file_source && -f $file_dest)
+	{
+	print "Comparing: $file_source with $file_dest\n";
+	$shell_string = "cmp -s $file_source $file_dest; echo \$?";
+	$result = `$shell_string`;
+	chomp($result);	
+	if ($result == 1)
+		{
+		$error = 0;
+		$cmd="diff $file_source $file_dest | grep -v \\\$Id | egrep -v -e \"---\"";
+		#print $cmd."\n";
+		@result=`$cmd`;
+		@result = map {
+		s/^\d+\w+\d+$/ok/g;
+		$_;
+		} @result;
+		#print @result;
+		for ($j = 0; $j < @result; $j++)
+		{
+		if ($result[$j] ne "ok\n")
+			{
+			$error = 1;
+			#$salli=<STDIN>;
+		}
+		}
+	if ($error == 1) {
+			print "Files differ: $key\n";
+			print MESSAGES "Files differ: $key\n";
+			print SOURCE "cp $file_source $file_dest\n";
+			print DEST "cp $file_dest $file_source\n";
+			print PLAIN "$file_source;$file_dest;m\n";
+			print MERGE "filemerge $file_source $file_dest\n";
+			}
+		}
+	elsif ($result == 2)
+		{
+		print "File does not exist $key\n"; 
+		}
+	}
+elsif (-d $file_source && -d $file_dest)
+{}
+else
+{
+print "Error: ";
+if (! -d $file_source && ! -f $file_source)
+	{
+	print "$key missing on source\n";
+	print MESSAGES "$key missing on source\n";
+	print MISS_SOURCE "cp $file_dest $file_source\n";
+	print PLAIN "$file_source;$file_dest;c\n";
+	}
+elsif (! -d $file_dest && ! -f $file_dest)
+	{
+	print "$key missing on dest\n";
+	print MESSAGES "$key missing on dest\n";
+	print MISS_DEST "cp $file_source $file_dest\n";
+	print PLAIN "$file_source;$file_dest;s\n";
+	}
+elsif (! -f $file_source)
+	{
+	print "$key missing on source\n";
+	print MESSAGES "$key missing on source\n";
+	print MISS_SOURCE "cp $file_dest $file_source\n";
+	print PLAIN "$file_source;$file_dest;c\n";
+	}
+elsif (! -f $file_dest)
+	{
+	print "$key missing on dest\n";
+	print MESSAGES "$key missing on dest\n";
+	print MISS_DEST "cp $file_source $file_dest\n";
+	print PLAIN "$file_source;$file_dest;s\n";
+	}
+else {
+	print "Serious problem";
+	}
+}
+}
+
+close(SOURCE);
+close(DEST);
+close(MISS_SOURCE);
+close(MISS_DEST);
+close(MERGE);
+close(MESSAGES);

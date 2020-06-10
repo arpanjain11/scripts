@@ -1,0 +1,38 @@
+#!/bin/ksh
+
+count_tr=1
+count=2
+lin_cnt=`wc -l pie.txt | awk {'print $1'}`
+while [ 1 -ne 2 ]
+do
+#seconds=`date '+%S'`
+#echo "Seconds $seconds\n"
+#lin_cnt=`wc -l pie.txt | awk {'print $1'}`
+counter=1
+while [ "(($counter-1))" -ne "$lin_cnt" ]
+do
+sleep 1
+seconds=`date '+%S'`
+echo "Seconds $seconds\n"
+count=`echo $counter"p"`
+sed -n ''$counter','$count'' pie.txt > lin1
+((counter=$counter+1))
+B1=`cat lin1 | awk -F/ {'print $1'}`
+B2=`cat lin1 | awk -F/ {'print $2'}`
+B3=`cat lin1 | awk -F/ {'print $3'}`
+ELEM=`cat lin1 | awk -F/ {'print $4'}`
+INFO=`cat lin1 | awk -F/ {'print $5'}`
+VAL=`cat lin1 | awk -F/ {'print $6'}`
+
+echo "$lin_cnt , $B1, $B2,$B3,$ELEM,$VAL\n"
+bau<<END>tmp
+b1.$B1
+b2.$B2
+b3.$B3
+elem.$ELEM
+info.$INFO
+val $VAL tra
+END
+#sleep 1
+done
+done
